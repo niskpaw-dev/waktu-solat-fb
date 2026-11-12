@@ -168,14 +168,11 @@ const CONFIG = {
   API_QUERY:  "",            // cth "&adjust=jugra" untuk pelarasan Bukit Jugra
   MASJID_HTML:"Masjid Kampung<br>Sungai Lang Baru",
   YEARS:      [2026, 2027],  // tahun dalam pemilih (dikemas kini auto dari years_available API)
-  ZONE_LABEL: "Daerah Kuala Langat", // label tetap atas grid; kosongkan ("") untuk guna zone_name API
+  // Label kawasan ikut zone_name API. Override hanya utk tahun yg disenaraikan
+  // (2026: API bagi "Klang, Kuala Langat"; poster guna label daerah). 2027+ terus ikut API.
+  ZONE_LABEL_OVERRIDE: { 2026: "Daerah Kuala Langat" },
   SITE:       "masjidkslb.com",
-  // Label zon & sumber kini datang dari API (zone_name, source) — tiada hardcode.
-  // source penuh terlalu panjang utk footer, jadi dipendekkan ikut kandungannya:
-  SOURCE_SHORT: [
-    [/JAKIM/i, "JAKIM e-Solat"],                  // 2026
-    [/Mufti/i, "Jabatan Mufti Negeri Selangor"],  // 2027+
-  ],
+  // Footer sumber guna terus source_short dari API (tiada pemendek sendiri).
   TIME_12H:   true,          // false = kekal 24-jam
   HIJRI_NUMERALS: "latin",   // "latin" (24) atau "arabic" (٢٤)
 };
@@ -230,18 +227,8 @@ function buildGrid(times){
   }).join("");
 }
 
-// 2026: zone_name "Klang, Kuala Langat" -> "Zon SGR03 \u00b7 Klang, Kuala Langat"
-// 2027: zone_name "Daerah Kuala Langat"  -> "Daerah Kuala Langat" (sistem daerah, tiada kod zon)
 function zoneLabel(meta){
-  if(CONFIG.ZONE_LABEL) return CONFIG.ZONE_LABEL;
-  const name = meta.zone_name || "";
-  if(/^daerah\b/i.test(name)) return name;
-  return [meta.zone ? "Zon "+meta.zone : "", name].filter(Boolean).join(" \u00b7 ");
-}
-function sourceLabel(src){
-  if(!src) return "";
-  for(const [re,label] of CONFIG.SOURCE_SHORT){ if(re.test(src)) return label; }
-  return src; // sumber tak dikenali: papar penuh, auto-fit akan kecilkan jika perlu
+  return CONFIG.ZONE_LABEL_OVERRIDE[meta.year] || meta.zone_name || "";
 }
 // Jaring keselamatan: kecilkan font footer jika teks melebihi lebar kandungan poster
 function fitFooter(){
@@ -259,7 +246,8 @@ function populate(day, meta){
   document.getElementById("p-hijri").textContent = hijriHTML(day.hijri);
   document.getElementById("p-zone").textContent = zoneLabel(meta);
   document.getElementById("p-site").textContent = CONFIG.SITE;
-  const src = sourceLabel(meta.source);
+  // source_short ialah medan rasmi utk poster; fitFooter kekal sbg jaring keselamatan
+  const src = meta.source_short || meta.source || "";
   document.getElementById("p-source").textContent = src ? "Sumber: "+src : "";
   buildGrid(day);
   fitFooter();
@@ -318,7 +306,8 @@ async function generate(){
   }
   if(Array.isArray(data.years_available)) fillYears(data.years_available, yy);
   await document.fonts.ready;
-  const meta={ zone:data.zone, zone_name:data.zone_name, source:data.source };
+  const meta={ year:+data.year || +yy, zone_name:data.zone_name,
+               source:data.source, source_short:data.source_short };
   for(let i=0;i<data.days.length;i++){
     const day=data.days[i];
     populate(day, meta);

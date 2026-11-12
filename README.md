@@ -17,8 +17,9 @@ Semua dalam blok `CONFIG` di atas `<script>` dalam `index.html`:
 
 - `API_BASE` — endpoint API waktu solat
 - `YEARS` — tahun dalam pemilih (turut dikemas kini auto dari `years_available` API)
-- `ZONE_LABEL` — label atas grid waktu; kosongkan (`""`) untuk guna `zone_name` dari API
-- `SOURCE_SHORT` — pemendek label sumber untuk footer (`source` penuh dari API terlalu panjang)
+- `ZONE_LABEL_OVERRIDE` — label kawasan ganti ikut tahun (`{2026: "Daerah Kuala Langat"}`); tahun lain terus guna `zone_name` dari API
+
+Footer sumber guna terus `source_short` dari API (fallback ke `source`, dengan auto-fit font).
 - `TIME_12H`, `HIJRI_NUMERALS` — format paparan
 
 ## Nota
