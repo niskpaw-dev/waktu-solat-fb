@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MKSLB · Penjana Poster Waktu Solat (Batch)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Amiri:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --ink:#0E2018; --gold:#C9A24B; --gold-soft:#D8BE78;
+    --cream:#F3ECDC; --marker:#A7B6A6; --hair:rgba(201,162,75,0.42); --stage-bg:#0b0f0d;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  body{ background:var(--stage-bg); min-height:100vh; padding:26px 16px 60px;
+        font-family:'Plus Jakarta Sans',sans-serif; color:var(--cream); -webkit-font-smoothing:antialiased; }
+  .wrap{ max-width:1080px; margin:0 auto; }
+  h1{ font-family:'Cormorant Garamond',serif; font-weight:600; font-size:30px; color:var(--cream); }
+  .sub{ font-size:13.5px; color:#8a978c; margin-top:4px; line-height:1.5; }
+  .panel{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin:22px 0 8px;
+          padding:16px; border:1px solid rgba(201,162,75,0.22); border-radius:14px;
+          background:rgba(22,48,36,0.35); }
+  label.fld{ font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-soft);
+             display:flex; flex-direction:column; gap:6px; }
+  select{ font-family:inherit; font-size:15px; color:var(--cream); background:#11241b;
+          border:1px solid rgba(201,162,75,0.35); border-radius:9px; padding:9px 12px; min-width:110px; }
+  .btn{ font-family:inherit; font-weight:600; font-size:14px; color:var(--ink); background:var(--gold);
+        border:none; border-radius:10px; padding:11px 20px; cursor:pointer;
+        transition:transform .25s cubic-bezier(.2,.8,.2,1),background .25s,opacity .2s; }
+  .btn:hover:not(:disabled){ background:var(--gold-soft); transform:translateY(-1px); }
+  .btn:focus-visible{ outline:2px solid var(--cream); outline-offset:3px; }
+  .btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .btn.ghost{ background:transparent; color:var(--gold-soft); border:1px solid rgba(201,162,75,0.4); }
+  .status{ font-size:13.5px; color:#a7b6a6; margin:14px 2px; min-height:20px; }
+  .bar{ height:4px; background:rgba(201,162,75,0.15); border-radius:99px; overflow:hidden; margin:4px 0 18px; }
+  .bar > i{ display:block; height:100%; width:0; background:var(--gold); transition:width .2s ease; }
+  .grid-thumbs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px; }
+  .thumb{ position:relative; border-radius:10px; overflow:hidden; cursor:pointer;
+          border:1px solid rgba(201,162,75,0.2); transition:transform .2s, border-color .2s; }
+  .thumb:hover{ transform:translateY(-2px); border-color:var(--gold); }
+  .thumb img{ width:100%; display:block; }
+  .thumb .cap{ position:absolute; bottom:0; left:0; right:0; padding:6px 8px; font-size:11px;
+               background:linear-gradient(180deg,transparent,rgba(14,32,24,0.85)); }
+
+  /* ── Render stage (offscreen, saiz penuh untuk capture tajam) ── */
+  .render-stage{ position:fixed; left:-99999px; top:0; }
+
+  /* ════ POSTER (komposisi dikunci) ════ */
+  .poster{ width:1080px; height:1350px; position:relative; overflow:hidden; background:var(--ink);
+           font-family:'Plus Jakarta Sans',sans-serif; }
+  .poster .bg{ position:absolute; inset:0; background-image:url('bg.jpg');
+               background-size:cover; background-position:center; }
+  .poster .scrim-top{ position:absolute; left:0; right:0; top:0; height:40%;
+    background:linear-gradient(180deg, rgba(14,32,24,0.66) 0%, rgba(14,32,24,0.30) 48%, rgba(14,32,24,0) 100%); }
+  .poster .scrim{ position:absolute; left:0; right:0; bottom:0; height:62%;
+    background:linear-gradient(180deg, rgba(14,32,24,0) 0%, rgba(14,32,24,0.12) 26%,
+      rgba(14,32,24,0.64) 56%, rgba(14,32,24,0.94) 100%); }
+  .poster .content{ position:absolute; inset:0; display:flex; flex-direction:column;
+            justify-content:space-between; padding:84px 76px 70px; }
+  .poster .eyebrow{ display:flex; align-items:center; gap:16px; color:var(--gold-soft);
+            font-size:21px; font-weight:600; letter-spacing:0.42em; text-transform:uppercase; }
+  .poster .eyebrow::after{ content:""; flex:1; height:1px; background:var(--hair); }
+  .poster .topbar{ display:flex; justify-content:space-between; align-items:flex-start; gap:34px; }
+  .poster .lockup{ flex:1; min-width:0; }
+  .poster .poster-logo{ width:170px; height:auto; flex:none; margin-top:4px;
+    filter:drop-shadow(0 2px 14px rgba(14,32,24,0.55)); }
+  .poster .masjid-name{ font-family:'Cormorant Garamond',serif; font-weight:600; font-size:66px;
+    line-height:1.04; color:var(--cream); margin-top:20px;
+    text-shadow:0 2px 22px rgba(14,32,24,0.55); }
+  .poster .datebar{ display:flex; align-items:baseline; gap:18px; margin-top:22px; color:var(--cream);
+            text-shadow:0 1px 14px rgba(14,32,24,0.5); }
+  .poster .date-masihi{ font-size:25px; font-weight:500; }
+  .poster .date-dot{ width:6px; height:6px; border-radius:50%; background:var(--gold); transform:translateY(-4px); }
+  .poster .date-hijri{ font-family:'Amiri',serif; font-size:30px; color:var(--cream); }
+  .poster .times-title{ display:flex; align-items:center; gap:18px; font-size:18px; font-weight:600;
+    letter-spacing:0.36em; text-transform:uppercase; color:var(--gold-soft); margin-bottom:26px; }
+  .poster .times-title::before,.poster .times-title::after{ content:""; height:1px; background:var(--hair); }
+  .poster .times-title::before{ width:34px; } .poster .times-title::after{ flex:1; }
+  .poster .grid{ display:grid; grid-template-columns:repeat(4,1fr); grid-template-rows:repeat(2,auto); }
+  .poster .cell{ padding:22px 14px 24px; text-align:center; border-top:1px solid var(--hair);
+         border-right:1px solid var(--hair); }
+  .poster .cell:nth-child(4n){ border-right:none; }
+  .poster .cell .label{ font-size:20px; font-weight:600; letter-spacing:0.16em; text-transform:uppercase; margin-bottom:8px; }
+  .poster .cell .time{ font-family:'Cormorant Garamond',serif; font-weight:500; line-height:1; }
+  .poster .cell .time .mer{ font-family:'Plus Jakarta Sans',sans-serif; font-weight:500; }
+  .poster .cell.fardhu .label{ color:var(--gold-soft); }
+  .poster .cell.fardhu .time{ color:var(--cream); font-size:52px; }
+  .poster .cell.fardhu .time .mer{ font-size:20px; color:rgba(243,236,220,0.75); margin-left:4px; }
+  .poster .cell.marker .label{ color:rgba(167,182,166,0.82); font-weight:500; }
+  .poster .cell.marker .time{ color:var(--marker); font-size:40px; opacity:0.94; }
+  .poster .cell.marker .time .mer{ font-size:16px; opacity:0.8; margin-left:3px; }
+  .poster .cell.marker .tag{ display:block; margin-top:7px; font-size:11px; letter-spacing:0.22em;
+    text-transform:uppercase; color:rgba(167,182,166,0.58); font-weight:600; }
+  .poster .cell.fardhu .tag{ display:none; }
+  .poster .footer{ display:flex; align-items:center; justify-content:center; gap:14px; margin-top:30px; white-space:nowrap;
+    font-size:17px; letter-spacing:0.14em; color:rgba(243,236,220,0.66); }
+  .poster .footer .sep{ width:5px; height:5px; border-radius:50%; background:var(--gold); opacity:0.8; }
+  .poster .footer .site{ color:var(--gold-soft); font-weight:600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Penjana Poster Waktu Solat &middot; MKSLB</h1>
+  <p class="sub">Tarik data terus dari API SGR03 kau, render sebulan poster sekali gus. Komposisi dikunci.</p>
+
+  <div class="panel">
+    <label class="fld">Bulan
+      <select id="month">
+        <option value="01">Januari</option><option value="02">Februari</option>
+        <option value="03">Mac</option><option value="04">April</option>
+        <option value="05">Mei</option><option value="06">Jun</option>
+        <option value="07">Julai</option><option value="08">Ogos</option>
+        <option value="09">September</option><option value="10">Oktober</option>
+        <option value="11">November</option><option value="12">Disember</option>
+      </select>
+    </label>
+    <label class="fld">Tahun
+      <select id="year"></select>
+    </label>
+    <button class="btn" id="gen">Jana Poster Sebulan</button>
+    <button class="btn ghost" id="zip" disabled>Muat Turun Semua (ZIP)</button>
+  </div>
+
+  <div class="status" id="status">Sedia. Pilih bulan, tekan Jana.</div>
+  <div class="bar"><i id="prog"></i></div>
+  <div class="grid-thumbs" id="thumbs"></div>
+</div>
+
+<!-- Render stage offscreen -->
+<div class="render-stage">
+  <div class="poster" id="poster">
+    <div class="bg"></div>
+    <div class="scrim-top"></div>
+    <div class="scrim"></div>
+    <div class="content">
+      <header class="topbar">
+        <div class="lockup">
+          <div class="eyebrow">Waktu Solat</div>
+          <h1 class="masjid-name" id="p-name">Masjid Kampung<br>Sungai Lang Baru</h1>
+          <div class="datebar">
+            <span class="date-masihi" id="p-masihi"></span>
+            <span class="date-dot"></span>
+            <span class="date-hijri" id="p-hijri"></span>
+          </div>
+        </div>
+        <img class="poster-logo" src="logo.png" alt="Logo Masjid Kampung Sungai Lang Baru">
+      </header>
+      <div class="times-wrap">
+        <div class="times-title" id="p-zone"></div>
+        <div class="grid" id="p-grid"></div>
+        <div class="footer">
+          <span class="site" id="p-site">masjidkslb.com</span><span class="sep"></span>
+          <span id="p-source">Sumber: JAKIM e-Solat</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════ CONFIG ════════════════════════
+   Tukar di sini sahaja. */
+const CONFIG = {
+  API_BASE:   "https://apiwaktusolatsgr03.vercel.app/api/waktu-solat", // <-- SAHKAN URL INI
+  API_QUERY:  "",            // cth "&adjust=jugra" untuk pelarasan Bukit Jugra
+  MASJID_HTML:"Masjid Kampung<br>Sungai Lang Baru",
+  YEARS:      [2026, 2027],  // tahun dalam pemilih (dikemas kini auto dari years_available API)
+  ZONE_LABEL: "Daerah Kuala Langat", // label tetap atas grid; kosongkan ("") untuk guna zone_name API
+  SITE:       "masjidkslb.com",
+  // Label zon & sumber kini datang dari API (zone_name, source) — tiada hardcode.
+  // source penuh terlalu panjang utk footer, jadi dipendekkan ikut kandungannya:
+  SOURCE_SHORT: [
+    [/JAKIM/i, "JAKIM e-Solat"],                  // 2026
+    [/Mufti/i, "Jabatan Mufti Negeri Selangor"],  // 2027+
+  ],
+  TIME_12H:   true,          // false = kekal 24-jam
+  HIJRI_NUMERALS: "latin",   // "latin" (24) atau "arabic" (٢٤)
+};
+/* ═════════════════════════════════════════════════════════ */
+
+const HIJRI_FULL = { Muh:"Muharram",Saf:"Safar",Raw:"Rabiulawal",Rak:"Rabiulakhir",
+  Jaw:"Jamadilawal",Jak:"Jamadilakhir",Rej:"Rejab",Syb:"Syaaban",
+  Ram:"Ramadan",Syw:"Syawal",Zkh:"Zulkaedah",Zhj:"Zulhijjah" };
+const MS_MONTH = ["Jan","Feb","Mac","Apr","Mei","Jun","Jul","Ogo","Sep","Okt","Nov","Dis"];
+const WAKTU = [
+  {k:"imsak",  label:"Imsak",  type:"marker", tag:"Peringatan"},
+  {k:"subuh",  label:"Subuh",  type:"fardhu"},
+  {k:"syuruk", label:"Syuruk", type:"marker", tag:"Peringatan"},
+  {k:"dhuha",  label:"Dhuha",  type:"marker", tag:"Sunat"},
+  {k:"zohor",  label:"Zohor",  type:"fardhu"},
+  {k:"asar",   label:"Asar",   type:"fardhu"},
+  {k:"maghrib",label:"Maghrib",type:"fardhu"},
+  {k:"isyak",  label:"Isyak",  type:"fardhu"},
+];
+
+const toArabic = s => String(s).replace(/[0-9]/g, d => "\u0660\u0661\u0662\u0663\u0664\u0665\u0666\u0667\u0668\u0669"[d]);
+function parseHijri(str){
+  if(typeof str!=="string") return {formatted:""};
+  const m=str.split("-"); if(m.length!==3) return {formatted:str};
+  const day=parseInt(m[0],10), month=HIJRI_FULL[m[1]]||m[1], year=parseInt(m[2],10);
+  return {day,month,year};
+}
+function hijriHTML(raw){
+  const h=parseHijri(raw); if(h.formatted!==undefined && h.day===undefined) return h.formatted;
+  let d=h.day, y=h.year;
+  if(CONFIG.HIJRI_NUMERALS==="arabic"){ d=toArabic(d); y=toArabic(y); }
+  return d+" "+h.month+" "+y+"H";
+}
+function fmtMasihi(iso){ const [y,m,d]=iso.split("-").map(Number); return d+" "+MS_MONTH[m-1]+" "+y; }
+function fmtTime(hhmm){
+  if(!hhmm) return {t:"\u2014", mer:""};
+  if(!CONFIG.TIME_12H) return {t:hhmm, mer:""};
+  let [h,m]=hhmm.split(":").map(Number);
+  const mer = h<12 ? "AM" : "PM";
+  let hh = h%12; if(hh===0) hh=12;
+  return {t:hh+":"+String(m).padStart(2,"0"), mer};
+}
+
+function buildGrid(times){
+  const grid=document.getElementById("p-grid");
+  grid.innerHTML = WAKTU.map(w=>{
+    const {t,mer}=fmtTime(times[w.k]);
+    const merHTML = mer ? '<span class="mer">'+mer+'</span>' : '';
+    const tagHTML = (w.type==="marker"&&w.tag) ? '<span class="tag">'+w.tag+'</span>' : '';
+    return '<div class="cell '+w.type+'"><div class="label">'+w.label+'</div>'+
+           '<div class="time">'+t+merHTML+'</div>'+tagHTML+'</div>';
+  }).join("");
+}
+
+// 2026: zone_name "Klang, Kuala Langat" -> "Zon SGR03 \u00b7 Klang, Kuala Langat"
+// 2027: zone_name "Daerah Kuala Langat"  -> "Daerah Kuala Langat" (sistem daerah, tiada kod zon)
+function zoneLabel(meta){
+  if(CONFIG.ZONE_LABEL) return CONFIG.ZONE_LABEL;
+  const name = meta.zone_name || "";
+  if(/^daerah\b/i.test(name)) return name;
+  return [meta.zone ? "Zon "+meta.zone : "", name].filter(Boolean).join(" \u00b7 ");
+}
+function sourceLabel(src){
+  if(!src) return "";
+  for(const [re,label] of CONFIG.SOURCE_SHORT){ if(re.test(src)) return label; }
+  return src; // sumber tak dikenali: papar penuh, auto-fit akan kecilkan jika perlu
+}
+// Jaring keselamatan: kecilkan font footer jika teks melebihi lebar kandungan poster
+function fitFooter(){
+  const f=document.querySelector(".poster .footer");
+  f.style.fontSize=""; f.style.letterSpacing="";
+  let size=17;
+  while(f.scrollWidth > f.clientWidth && size > 12){
+    size -= 0.5; f.style.fontSize=size+"px"; f.style.letterSpacing="0.08em";
+  }
+}
+
+function populate(day, meta){
+  document.getElementById("p-name").innerHTML = CONFIG.MASJID_HTML;
+  document.getElementById("p-masihi").textContent = fmtMasihi(day.date);
+  document.getElementById("p-hijri").textContent = hijriHTML(day.hijri);
+  document.getElementById("p-zone").textContent = zoneLabel(meta);
+  document.getElementById("p-site").textContent = CONFIG.SITE;
+  const src = sourceLabel(meta.source);
+  document.getElementById("p-source").textContent = src ? "Sumber: "+src : "";
+  buildGrid(day);
+  fitFooter();
+}
+
+const results=[]; // {name, blob, url}
+function setStatus(t){ document.getElementById("status").textContent=t; }
+function setProg(p){ document.getElementById("prog").style.width=(p*100)+"%"; }
+
+async function snapshot(){
+  const canvas = await html2canvas(document.getElementById("poster"),
+    {width:1080,height:1350,scale:2,backgroundColor:null,useCORS:true,logging:false});
+  return new Promise(r=>canvas.toBlob(b=>r(b),"image/png"));
+}
+
+// \u2500\u2500 Pemilih tahun & bulan: default = bulan DEPAN (waktu KL), sebab poster dijana awal \u2500\u2500
+function klNow(){
+  const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kuala_Lumpur",year:"numeric",month:"2-digit"})
+    .formatToParts(new Date());
+  return { y:+p.find(x=>x.type==="year").value, m:+p.find(x=>x.type==="month").value };
+}
+function fillYears(years, keep){
+  const sel=document.getElementById("year");
+  sel.innerHTML=years.map(y=>'<option value="'+y+'">'+y+'</option>').join("");
+  if(keep && years.includes(+keep)) sel.value=String(keep);
+}
+function initPickers(){
+  const {y,m}=klNow();
+  const ny = m===12 ? y+1 : y, nm = m===12 ? 1 : m+1;
+  const years=[...new Set([...CONFIG.YEARS, ny])].sort();
+  fillYears(years, ny);
+  document.getElementById("month").value=String(nm).padStart(2,"0");
+}
+
+async function generate(){
+  const mm=document.getElementById("month").value;
+  const yy=document.getElementById("year").value;
+  const genBtn=document.getElementById("gen"), zipBtn=document.getElementById("zip");
+  genBtn.disabled=true; zipBtn.disabled=true;
+  document.getElementById("thumbs").innerHTML=""; results.length=0; setProg(0);
+  setStatus("Menarik data "+mm+"/"+yy+" dari API\u2026");
+  let data;
+  try{
+    // WAJIB hantar year \u2014 tanpanya API guna tahun semasa
+    const url=CONFIG.API_BASE+"?month="+mm+"&year="+yy+CONFIG.API_QUERY;
+    const res=await fetch(url); data=await res.json();
+    if(!data.days||!data.days.length) throw new Error(data.error||"Tiada data hari");
+    // Jaring keselamatan: pastikan setiap hari memang tahun & bulan yang diminta
+    const want=yy+"-"+mm;
+    const wrong=data.days.filter(d=>d.date.slice(0,7)!==want);
+    if(wrong.length) throw new Error("API pulangkan tarikh "+wrong[0].date+", bukan "+want);
+  }catch(e){
+    if(data && Array.isArray(data.years_available)) fillYears(data.years_available, yy);
+    setStatus("\u274c Gagal tarik API: "+e.message);
+    genBtn.disabled=false; return;
+  }
+  if(Array.isArray(data.years_available)) fillYears(data.years_available, yy);
+  await document.fonts.ready;
+  const meta={ zone:data.zone, zone_name:data.zone_name, source:data.source };
+  for(let i=0;i<data.days.length;i++){
+    const day=data.days[i];
+    populate(day, meta);
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const blob=await snapshot();
+    const fname="mkslb-waktu-"+day.date+".png";
+    const url=URL.createObjectURL(blob);
+    results.push({name:fname, blob, url});
+    const div=document.createElement("div"); div.className="thumb";
+    div.innerHTML='<img src="'+url+'" alt="'+day.date+'"><span class="cap">'+fmtMasihi(day.date)+'</span>';
+    div.title="Klik untuk muat turun "+fname;
+    div.addEventListener("click",()=>{ const a=document.createElement("a"); a.href=url; a.download=fname; a.click(); });
+    document.getElementById("thumbs").appendChild(div);
+    setProg((i+1)/data.days.length);
+    setStatus("Menjana "+(i+1)+" / "+data.days.length+" poster\u2026");
+  }
+  setStatus("\u2705 Siap "+results.length+" poster. Klik mana-mana untuk muat turun satu, atau ZIP untuk semua.");
+  genBtn.disabled=false; zipBtn.disabled=false;
+}
+
+async function downloadZip(){
+  const zipBtn=document.getElementById("zip"); zipBtn.disabled=true;
+  setStatus("Membungkus ZIP\u2026");
+  const zip=new JSZip();
+  const mm=document.getElementById("month").value, yy=document.getElementById("year").value;
+  results.forEach(r=>zip.file(r.name, r.blob));
+  const blob=await zip.generateAsync({type:"blob"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="mkslb-waktu-solat-"+yy+"-"+mm+".zip"; a.click();
+  setStatus("\u2705 ZIP dimuat turun ("+results.length+" poster).");
+  zipBtn.disabled=false;
+}
+
+initPickers();
+document.getElementById("gen").addEventListener("click", generate);
+document.getElementById("zip").addEventListener("click", downloadZip);
+</script>
+</body>
+</html>
